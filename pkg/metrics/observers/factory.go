@@ -32,6 +32,7 @@ func NewFactory(metricsServer string) (*Factory, error) {
 		Type:      "prometheus",
 		Address:   metricsServer,
 		SecretRef: nil,
+		InsecureSkipVerify: true,
 	}, nil)
 	if err != nil {
 		return nil, err

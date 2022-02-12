@@ -25,6 +25,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -33,7 +34,11 @@ import (
 	flaggerv1 "github.com/fluxcd/flagger/pkg/apis/flagger/v1beta1"
 )
 
-const prometheusOnlineQuery = "vector(1)"
+const (
+	prometheusOnlineQuery = "vector(1)"
+	// Token to access to OpenShift Prometheus
+	tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
 
 // PrometheusProvider executes promQL queries
 type PrometheusProvider struct {
@@ -41,7 +46,9 @@ type PrometheusProvider struct {
 	url      url.URL
 	username string
 	password string
-	client   *http.Client
+	// Token to access to OpenShift Prometheus
+	token  string
+	client *http.Client
 }
 
 type prometheusResponse struct {
@@ -90,6 +97,15 @@ func NewPrometheusProvider(provider flaggerv1.MetricTemplateProvider, credential
 		}
 	}
 
+	// Token to access to OpenShift Prometheus
+	prom.token = ""
+	dat, err := os.ReadFile(tokenPath)
+	if err != nil {
+		fmt.Println("Accessing to Prometheus without setting the \"Authorization: Bearer token\" header: ", err)
+	} else {
+		prom.token = string(dat)
+	}
+
 	return &prom, nil
 }
 
@@ -111,6 +127,11 @@ func (p *PrometheusProvider) RunQuery(query string) (float64, error) {
 
 	if p.username != "" && p.password != "" {
 		req.SetBasicAuth(p.username, p.password)
+	}
+
+	// Token to access to OpenShift Prometheus
+	if p.token != "" {
+		req.Header.Set("Authorization", "Bearer "+p.token)
 	}
 
 	ctx, cancel := context.WithTimeout(req.Context(), p.timeout)
